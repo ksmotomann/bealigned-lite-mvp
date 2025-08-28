@@ -50,7 +50,7 @@ export function FeelingsChips({ selectedFeelings, onToggleFeeling }: FeelingsChi
             {categoryLabels[category]}
           </h4>
           <div className="flex flex-wrap gap-2">
-            {feelings.map((feeling: any) => (
+            {(feelings as any[]).map((feeling: any) => (
               <button
                 key={feeling.term}
                 onClick={() => onToggleFeeling(feeling.term)}

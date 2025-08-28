@@ -51,7 +51,7 @@ export function ValuesChips({ selectedValues, onToggleValue }: ValuesChipsProps)
             {categoryLabels[category]}
           </h4>
           <div className="flex flex-wrap gap-2">
-            {values.map((value: any) => (
+            {(values as any[]).map((value: any) => (
               <button
                 key={value.term}
                 onClick={() => onToggleValue(value.term)}

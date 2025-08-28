@@ -135,7 +135,7 @@ export default function StepNew() {
       .order('step_id', { ascending: true })
 
     const completed = new Set(responses?.map(r => r.step_id) || [])
-    setCompletedSteps(Array.from(completed))
+    setCompletedSteps(Array.from(completed) as number[])
   }
 
   const handleSend = async () => {
