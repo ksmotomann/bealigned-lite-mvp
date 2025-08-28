@@ -215,8 +215,8 @@ export default function Reflection() {
       }
       
       const data = await response.json()
-        
-        // Check if AI response contains a phase transition (has --- separator)
+      
+      // Check if AI response contains a phase transition (has --- separator)
         const hasPhaseTransition = data.ai_text.includes('---') && (data.auto_progress && !data.session_complete)
         
         if (hasPhaseTransition) {
@@ -299,34 +299,6 @@ export default function Reflection() {
             setPhaseSummaries(prev => ({...prev, [currentStep]: data.phase_summary}))
           }
         }
-      } else {
-        // Handle error with fallback
-        const errorText = await response.text().catch(() => 'No error details available')
-        let errorDetails = `Error ${response.status}: `
-        try {
-          const errorData = JSON.parse(errorText)
-          errorDetails += errorData.error || 'Unknown error'
-          if (errorData.details) {
-            errorDetails += ` - ${errorData.details}`
-          }
-          if (errorData.hint) {
-            errorDetails += ` (${errorData.hint})`
-          }
-        } catch {
-          errorDetails += errorText || 'AI service unavailable'
-        }
-        console.error('AI response error:', response.status, errorText)
-        const fallbackMessage: Message = {
-          id: `ai-${Date.now()}`,
-          type: 'ai',
-          content: "I hear you. That sounds really challenging. Can you tell me more about what's happening?",
-          timestamp: new Date(),
-          source: 'fallback',
-          stepId: currentStep,
-          errorDetails
-        }
-        setMessages(prev => [...prev, fallbackMessage])
-      }
     } catch (error) {
       console.error('Error getting AI response:', error)
       const fallbackMessage: Message = {
