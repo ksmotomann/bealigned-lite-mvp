@@ -185,6 +185,15 @@ export default function Reflection() {
     }, 0)
 
     try {
+      // Check if environment variables are set
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        console.error('Missing environment variables:', {
+          url: import.meta.env.VITE_SUPABASE_URL ? 'Set' : 'Missing',
+          key: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'Set' : 'Missing'
+        })
+        throw new Error('Missing required environment variables. Please check your .env configuration.')
+      }
+      
       // Get AI response
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/responses-proxy`, {
         method: 'POST',
@@ -199,8 +208,13 @@ export default function Reflection() {
         }),
       })
 
-      if (response.ok) {
-        const data = await response.json()
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Edge Function error:', response.status, errorText)
+        throw new Error(`Failed to fetch: ${response.status} - ${errorText}`)
+      }
+      
+      const data = await response.json()
         
         // Check if AI response contains a phase transition (has --- separator)
         const hasPhaseTransition = data.ai_text.includes('---') && (data.auto_progress && !data.session_complete)
@@ -322,7 +336,7 @@ export default function Reflection() {
         timestamp: new Date(),
         source: 'fallback',
         stepId: currentStep,
-        errorDetails: `Network error: ${error instanceof Error ? error.message : 'Failed to connect to AI service'}`
+        errorDetails: `Network error: ${error instanceof Error ? error.message : 'Failed to connect to AI service'}. Check console for details.`
       }
       setMessages(prev => [...prev, fallbackMessage])
     } finally {
