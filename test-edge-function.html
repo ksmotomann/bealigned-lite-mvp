@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Edge Function</title>
+</head>
+<body>
+    <h1>Test Edge Function Connection</h1>
+    <button onclick="testFunction()">Test Password Gate Function</button>
+    <pre id="result"></pre>
+    
+    <script>
+        async function testFunction() {
+            const url = prompt('Enter your Supabase URL (from .env VITE_SUPABASE_URL):');
+            const anonKey = prompt('Enter your Supabase Anon Key (from .env VITE_SUPABASE_ANON_KEY):');
+            
+            if (!url || !anonKey) {
+                document.getElementById('result').textContent = 'URL and Anon Key required';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${url}/functions/v1/mvp-password-gate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${anonKey}`,
+                    },
+                    body: JSON.stringify({ password: 'test' }),
+                });
+                
+                const data = await response.json();
+                document.getElementById('result').textContent = 
+                    `Status: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`;
+            } catch (error) {
+                document.getElementById('result').textContent = `Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

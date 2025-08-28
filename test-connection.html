@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Connection</title>
+</head>
+<body>
+    <h1>Debug Edge Function Connection</h1>
+    <button onclick="testDirect()">Test Direct Call</button>
+    <pre id="result"></pre>
+    
+    <script>
+        // Your actual Supabase URL and key from .env
+        const SUPABASE_URL = 'https://kzuumrtbroooxpneybyx.supabase.co';
+        const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6dXVtcnRicm9vb3hwbmV5Ynl4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjQ3OTcxNzMsImV4cCI6MjA0MDM3MzE3M30.g_5BLJnev5loepSZ_tyxZDq7JQIXR_znaFiJGZ5dXnk';
+        
+        async function testDirect() {
+            const result = document.getElementById('result');
+            result.textContent = 'Testing...';
+            
+            try {
+                console.log('Calling:', `${SUPABASE_URL}/functions/v1/mvp-password-gate`);
+                
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/mvp-password-gate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${ANON_KEY}`,
+                        'apikey': ANON_KEY  // Supabase sometimes needs this too
+                    },
+                    body: JSON.stringify({ password: 'test123' })
+                });
+                
+                const text = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    data = text;
+                }
+                
+                result.textContent = `Status: ${response.status}\n` +
+                                    `Headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2)}\n` +
+                                    `Response: ${typeof data === 'object' ? JSON.stringify(data, null, 2) : data}`;
+                                    
+            } catch (error) {
+                result.textContent = `Error: ${error.message}\n${error.stack}`;
+                console.error('Full error:', error);
+            }
+        }
+        
+        // Test on load
+        window.onload = testDirect;
+    </script>
+</body>
+</html>
