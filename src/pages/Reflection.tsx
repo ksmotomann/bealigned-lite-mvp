@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useSession } from '@/contexts/SessionContext'
 import { supabase } from '@/lib/supabase'
 import { ChatMessage } from '@/components/ChatMessage'
-import { ArrowLeft, Send, Settings, Edit3, Save, X, GitCompare, Tag, Copy, Download, Star } from 'lucide-react'
+import { ArrowLeft, Send, Settings, Edit3, Save, X, Tag, Copy, Download, Star } from 'lucide-react'
 import { getTimeBasedGreeting } from '@/utils/greetings'
 
 interface Message {
@@ -56,9 +56,6 @@ export default function Reflection() {
   const [chatgptResponse, setChatgptResponse] = useState('')
   const [refinementFeedback, setRefinementFeedback] = useState('')
   const [useChatGPTAsPrimary, setUseChatGPTAsPrimary] = useState(false)
-  const [isComparing, setIsComparing] = useState<string | null>(null)
-  const [gptResponse, setGptResponse] = useState('')
-  const [comparisonNotes, setComparisonNotes] = useState('')
   const [isCategorizing, setIsCategorizing] = useState<string | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<ResponseCategory | null>(null)
   const [showingErrorDetails, setShowingErrorDetails] = useState<string | null>(null)

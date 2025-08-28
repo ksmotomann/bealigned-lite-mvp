@@ -1,0 +1,1 @@
+{"root":["./vite.config.ts","./scripts/clear-refinements.ts","./scripts/generate-password-hash.ts","./scripts/seed-knowledge.ts","./scripts/validate-responses.ts","./scripts/verify-env.ts"],"errors":true,"version":"5.9.2"}

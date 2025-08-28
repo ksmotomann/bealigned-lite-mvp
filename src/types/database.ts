@@ -250,6 +250,224 @@ export interface Database {
           created_at?: string
         }
       }
+      refined_responses: {
+        Row: {
+          id: string
+          response_id: string | null
+          step_id: number
+          user_text: string
+          original_text: string
+          refined_text: string | null
+          chatgpt_response: string | null
+          use_chatgpt_as_primary: boolean
+          feedback: string | null
+          is_approved: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          response_id?: string | null
+          step_id: number
+          user_text: string
+          original_text: string
+          refined_text?: string | null
+          chatgpt_response?: string | null
+          use_chatgpt_as_primary?: boolean
+          feedback?: string | null
+          is_approved?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          response_id?: string | null
+          step_id?: number
+          user_text?: string
+          original_text?: string
+          refined_text?: string | null
+          chatgpt_response?: string | null
+          use_chatgpt_as_primary?: boolean
+          feedback?: string | null
+          is_approved?: boolean
+          created_at?: string
+        }
+      }
+      response_feedback: {
+        Row: {
+          id: string
+          response_id: string
+          session_id: string
+          step_id: number
+          is_helpful: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          response_id: string
+          session_id: string
+          step_id: number
+          is_helpful: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          response_id?: string
+          session_id?: string
+          step_id?: number
+          is_helpful?: boolean
+          created_at?: string
+        }
+      }
+      gpt_reference_responses: {
+        Row: {
+          id: string
+          session_id: string | null
+          step_id: number
+          user_text: string
+          app_response: string
+          gpt_response: string
+          comparison_notes: string | null
+          key_differences: Json | null
+          improvements_needed: string[] | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          session_id?: string | null
+          step_id: number
+          user_text: string
+          app_response: string
+          gpt_response: string
+          comparison_notes?: string | null
+          key_differences?: Json | null
+          improvements_needed?: string[] | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          session_id?: string | null
+          step_id?: number
+          user_text?: string
+          app_response?: string
+          gpt_response?: string
+          comparison_notes?: string | null
+          key_differences?: Json | null
+          improvements_needed?: string[] | null
+          created_at?: string
+        }
+      }
+      model_improvements: {
+        Row: {
+          id: string
+          pattern_type: string
+          step_id: number
+          trigger_phrase: string | null
+          current_response: string
+          improved_response: string
+          improvement_reason: string | null
+          source_type: string | null
+          chatgpt_pattern: string | null
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          pattern_type: string
+          step_id: number
+          trigger_phrase?: string | null
+          current_response: string
+          improved_response: string
+          improvement_reason?: string | null
+          source_type?: string | null
+          chatgpt_pattern?: string | null
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          pattern_type?: string
+          step_id?: number
+          trigger_phrase?: string | null
+          current_response?: string
+          improved_response?: string
+          improvement_reason?: string | null
+          source_type?: string | null
+          chatgpt_pattern?: string | null
+          is_active?: boolean
+          created_at?: string
+        }
+      }
+      response_category_patterns: {
+        Row: {
+          id: string
+          step_id: number
+          category: string
+          pattern_text: string
+          example_responses: string[] | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          step_id: number
+          category: string
+          pattern_text: string
+          example_responses?: string[] | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          step_id?: number
+          category?: string
+          pattern_text?: string
+          example_responses?: string[] | null
+          created_at?: string
+        }
+      }
+      admin_settings: {
+        Row: {
+          id: string
+          setting_key: string
+          setting_value: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          setting_key: string
+          setting_value?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          setting_key?: string
+          setting_value?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      session_feedback: {
+        Row: {
+          id: string
+          session_id: string
+          rating: number
+          feedback: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          session_id: string
+          rating: number
+          feedback?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          session_id?: string
+          rating?: number
+          feedback?: string | null
+          created_at?: string
+        }
+      }
       audit_logs: {
         Row: {
           id: number
@@ -289,6 +507,18 @@ export interface Database {
           chunk: string
           similarity: number
         }[]
+      }
+      get_best_refinement: {
+        Args: {
+          p_step_id: number
+          p_user_text: string
+        }
+        Returns: {
+          confidence: number
+          use_chatgpt: boolean
+          chatgpt_response: string | null
+          refined_text: string | null
+        } | null
       }
     }
     Enums: {
