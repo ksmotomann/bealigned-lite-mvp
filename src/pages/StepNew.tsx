@@ -4,8 +4,8 @@ import { useSession } from '@/contexts/SessionContext'
 import { supabase } from '@/lib/supabase'
 import { ChatMessage } from '@/components/ChatMessage'
 import { ProgressTracker } from '@/components/ProgressTracker'
-import { ArrowLeft, Send, Settings, Edit3, Save, X, GitCompare, ThumbsUp, ThumbsDown, Tag } from 'lucide-react'
-import { getTimeBasedGreeting } from '@/utils/greetings'
+import { ArrowLeft, Send, Settings, Edit3, Save, X, GitCompare, ThumbsUp, ThumbsDown, Tag, FastForward, Code } from 'lucide-react'
+import { getWarmWelcome, getStepOnePrompt } from '@/utils/greetings'
 
 interface Message {
   id: string
@@ -15,6 +15,13 @@ interface Message {
   responseId?: string
   category?: string
   source?: 'ai' | 'fallback' | 'refined' | 'knowledge'
+  openaiPrompt?: {
+    system: string
+    user: string
+    model: string
+    temperature: number
+    max_tokens: number
+  }
 }
 
 type ResponseCategory = 
@@ -45,7 +52,7 @@ export default function StepNew() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [completedSteps, setCompletedSteps] = useState<number[]>([])
-  const [adminMode, setAdminMode] = useState(false)
+  const [adminMode, setAdminMode] = useState(true) // Default to true for development
   const [isRefining, setIsRefining] = useState<string | null>(null)
   const [refinedText, setRefinedText] = useState('')
   const [chatgptResponse, setChatgptResponse] = useState('')
@@ -56,6 +63,7 @@ export default function StepNew() {
   const [comparisonNotes, setComparisonNotes] = useState('')
   const [isCategorizing, setIsCategorizing] = useState<string | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<ResponseCategory | null>(null)
+  const [viewingPrompt, setViewingPrompt] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const currentStep = Number(stepId)
 
@@ -66,13 +74,26 @@ export default function StepNew() {
   }, [stepId])
 
   const checkAdminMode = async () => {
-    const { data } = await supabase
-      .from('admin_settings')
-      .select('setting_value')
-      .eq('setting_key', 'admin_mode')
-      .single()
-    
-    if (data?.setting_value?.enabled) {
+    try {
+      const { data, error } = await supabase
+        .from('admin_settings')
+        .select('setting_value')
+        .eq('setting_key', 'admin_mode')
+        .single()
+      
+      console.log('Admin mode check:', { data, error })
+      
+      if (data?.setting_value?.enabled) {
+        setAdminMode(true)
+        console.log('Admin mode ENABLED')
+      } else {
+        // Default to true if no setting exists (for development)
+        setAdminMode(true)
+        console.log('Admin mode ENABLED (default)')
+      }
+    } catch (err) {
+      // If table doesn't exist or error, enable admin mode for development
+      console.log('Admin mode ENABLED (fallback)', err)
       setAdminMode(true)
     }
   }
@@ -96,11 +117,17 @@ export default function StepNew() {
 
     const existingMessages: Message[] = []
     
-    // Add initial AI prompt
+    // Add initial AI prompt with warm, varied greeting for Step 1
+    let initialPrompt = stepPrompts[currentStep as keyof typeof stepPrompts]
+    if (currentStep === 1 && (!responses || responses.length === 0)) {
+      // For Step 1, combine warm welcome with step prompt
+      initialPrompt = `${getWarmWelcome()}\n\n${getStepOnePrompt()}`
+    }
+    
     existingMessages.push({
       id: `ai-init-${currentStep}`,
       type: 'ai',
-      content: stepPrompts[currentStep as keyof typeof stepPrompts],
+      content: initialPrompt,
       timestamp: new Date()
     })
 
@@ -178,7 +205,8 @@ export default function StepNew() {
           responseId: data.response_id,
           source: data.knowledge_audit?.refinement_applied ? 'refined' : 
                   data.knowledge_audit?.grounding_sources?.[0] === 'Admin refinement' ? 'refined' :
-                  data.knowledge_audit ? 'knowledge' : 'ai'
+                  data.knowledge_audit ? 'knowledge' : 'ai',
+          openaiPrompt: data.openai_prompt // Save the OpenAI prompt for admin visibility
         }
         
         setMessages(prev => [...prev, aiMessage])
@@ -201,11 +229,12 @@ export default function StepNew() {
         }
       } else {
         // Handle error - show a generic empathetic response
-        console.error('AI response error:', response.status)
+        const errorText = await response.text()
+        console.error('AI response error:', response.status, errorText)
         const fallbackMessage: Message = {
           id: `ai-${Date.now()}`,
           type: 'ai',
-          content: "I hear you. That sounds really challenging. Can you tell me more about what's happening?",
+          content: "I hear you. Let me try to understand better - can you share more about what you're experiencing?",
           timestamp: new Date(),
           source: 'fallback'
         }
@@ -241,7 +270,7 @@ export default function StepNew() {
       ? chatgptResponse 
       : refinedText || chatgptResponse || message.content
 
-    // Save refined response to database for future learning
+    // Save refined response with HIGH confidence for immediate training
     const { error } = await supabase
       .from('refined_responses')
       .insert({
@@ -252,14 +281,15 @@ export default function StepNew() {
         chatgpt_response: chatgptResponse,
         use_chatgpt_as_primary: useChatGPTAsPrimary,
         feedback: refinementFeedback,
-        is_approved: true
+        is_approved: true,
+        confidence: 0.95 // HIGH confidence for admin edits during chat
       })
 
     if (!error) {
-      // IMMEDIATELY update the UI with the refined prompt
+      // IMMEDIATELY update the UI with the refined prompt and mark as refined
       setMessages(prev => prev.map(m => 
         m.id === isRefining 
-          ? { ...m, content: bestPrompt }
+          ? { ...m, content: bestPrompt, source: 'refined' as const }
           : m
       ))
       
@@ -273,14 +303,29 @@ export default function StepNew() {
             trigger_phrase: userMessage?.content.substring(0, 100),
             current_response: message.content,
             improved_response: bestPrompt,
-            improvement_reason: refinementFeedback || 'Admin refinement',
+            improvement_reason: refinementFeedback || 'Admin refinement during chat - HIGH PRIORITY',
             source_type: chatgptResponse ? 'chatgpt' : 'manual',
             chatgpt_pattern: chatgptResponse,
+            confidence_score: 0.95, // High confidence for admin live edits
             is_active: true
           })
         
-        console.log('✅ Response updated and saved for AI learning')
+        console.log('✅ Response updated and saved for IMMEDIATE AI training with HIGH confidence')
       }
+      
+      // Show success notification
+      const successMsg = chatgptResponse && useChatGPTAsPrimary 
+        ? '✨ ChatGPT response saved and AI trained for future similar inputs!'
+        : '✨ Refined response saved and AI trained for future similar inputs!'
+      
+      // Add a system message to show training success
+      setMessages(prev => [...prev, {
+        id: `system-${Date.now()}`,
+        type: 'ai' as const,
+        content: successMsg,
+        timestamp: new Date(),
+        source: 'ai' as const
+      }])
       
       setIsRefining(null)
       setRefinedText('')
@@ -487,11 +532,99 @@ export default function StepNew() {
     }
   }
 
+  const handleProgressPhase = async (messageId: string) => {
+    // Find the AI message and the preceding user message
+    const messageIndex = messages.findIndex(m => m.id === messageId)
+    if (messageIndex === -1) return
+    
+    const aiMessage = messages[messageIndex]
+    if (aiMessage.type !== 'ai') return
+    
+    // Find the most recent user message before this AI response
+    let userMessage = null
+    for (let i = messageIndex - 1; i >= 0; i--) {
+      if (messages[i].type === 'user') {
+        userMessage = messages[i]
+        break
+      }
+    }
+    
+    if (!userMessage) return
+    
+    // Count conversation turns (pairs of user-AI messages)
+    const conversationTurn = messages.filter(m => m.type === 'user').length
+    
+    // Analyze the user message
+    const userWords = userMessage.content.split(/\s+/).length
+    const emotionWords = ['feel', 'feeling', 'frustrated', 'angry', 'sad', 'happy', 'worried', 'anxious', 'hurt', 'confused']
+    const hasEmotions = emotionWords.some(word => userMessage.content.toLowerCase().includes(word))
+    const valueWords = ['important', 'value', 'believe', 'need', 'want', 'matters', 'care']
+    const hasValues = valueWords.some(word => userMessage.content.toLowerCase().includes(word))
+    const perspectiveWords = ['they', 'their', 'them', 'perspective', 'might think', 'probably']
+    const hasPerspective = perspectiveWords.some(word => userMessage.content.toLowerCase().includes(word))
+    
+    // Save the feedback
+    const { error: feedbackError } = await supabase
+      .from('phase_progression_feedback')
+      .insert({
+        session_id: sessionId,
+        step_id: currentStep,
+        response_id: aiMessage.responseId || null,
+        user_message: userMessage.content,
+        ai_response: aiMessage.content,
+        conversation_turn: conversationTurn,
+        should_have_progressed: true,
+        admin_notes: 'Admin indicated phase should progress',
+        user_word_count: userWords,
+        had_emotions: hasEmotions,
+        had_values: hasValues,
+        had_perspective: hasPerspective,
+        message_category: userMessage.category || null
+      })
+    
+    if (feedbackError) {
+      console.error('Error saving progression feedback:', feedbackError)
+    }
+    
+    // Update the learned patterns
+    const { data: pattern } = await supabase
+      .from('phase_progression_patterns')
+      .select('*')
+      .eq('step_id', currentStep)
+      .single()
+    
+    if (pattern) {
+      // Update pattern based on feedback
+      const updates: any = {
+        feedback_count: pattern.feedback_count + 1,
+        confidence_score: Math.min(1.0, pattern.confidence_score + 0.05),
+        updated_at: new Date().toISOString()
+      }
+      
+      // Adjust criteria based on this example
+      if (conversationTurn < (pattern.min_conversation_turns || 99)) {
+        updates.min_conversation_turns = conversationTurn
+      }
+      
+      if (userWords < (pattern.min_word_count || 99)) {
+        updates.min_word_count = userWords
+      }
+      
+      await supabase
+        .from('phase_progression_patterns')
+        .update(updates)
+        .eq('id', pattern.id)
+    }
+    
+    // Actually progress to the next phase
+    handleNext()
+  }
+
   const handleNext = () => {
     if (currentStep < 7) {
       navigate(`/step/${currentStep + 1}`)
     } else {
-      navigate('/start')
+      navigate('/complete')
     }
   }
 
@@ -513,8 +646,74 @@ export default function StepNew() {
     7: "Choose + Communicate"
   }
 
+  // Debug logging
+  console.log('Admin button visibility check:', {
+    adminMode,
+    currentStep,
+    userMessageCount: messages.filter(m => m.type === 'user').length,
+    shouldShowButton: adminMode && currentStep < 7 && messages.filter(m => m.type === 'user').length > 0
+  })
+
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <>
+      {/* Admin Bar - Always at Top */}
+      {adminMode && (
+        <div className="fixed top-0 left-0 right-0 bg-yellow-400 text-black px-4 py-2 z-[10000] flex items-center justify-between shadow-lg">
+          <div className="flex items-center gap-3">
+            <span className="font-bold">🎓 ADMIN MODE</span>
+            <span className="text-sm">Step {currentStep}/7</span>
+          </div>
+          {currentStep < 7 && (
+            <button
+              onClick={() => {
+                if (confirm(`Skip to Step ${currentStep + 1} and train AI?`)) {
+                  const lastAiMessage = [...messages].reverse().find(m => m.type === 'ai')
+                  if (lastAiMessage) {
+                    handleProgressPhase(lastAiMessage.id)
+                  } else {
+                    handleNext()
+                  }
+                }
+              }}
+              className="px-4 py-1 bg-green-700 text-white rounded-lg font-bold hover:bg-green-800"
+            >
+              ⏩ SKIP TO STEP {currentStep + 1}
+            </button>
+          )}
+        </div>
+      )}
+      
+      <div className={`min-h-screen bg-gray-50 flex ${adminMode ? 'pt-12' : ''}`}>
+      {/* Floating Admin Progress Button - ALWAYS VISIBLE IN ADMIN MODE */}
+      {adminMode && currentStep < 7 && (
+        <div className="fixed bottom-20 right-4 z-[9999]" style={{ zIndex: 9999 }}>
+          <button
+            onClick={() => {
+              const lastAiMessage = [...messages].reverse().find(m => m.type === 'ai')
+              if (confirm(`Progress to Step ${currentStep + 1}?\n\nUse this when the AI asked an unnecessary follow-up question. The system will learn to progress faster next time.`)) {
+                if (lastAiMessage) {
+                  handleProgressPhase(lastAiMessage.id)
+                } else {
+                  // If no AI message yet, just navigate
+                  handleNext()
+                }
+              }
+            }}
+            className="group flex items-center gap-2 px-6 py-4 bg-green-600 text-white rounded-full shadow-2xl hover:bg-green-700 hover:shadow-xl transition-all hover:scale-110 text-lg font-semibold"
+            title="Progress to next step and train AI"
+          >
+            <FastForward className="w-6 h-6" />
+            <span>Skip to Step {currentStep + 1}</span>
+          </button>
+          <div className="mt-2 p-3 bg-yellow-100 border-2 border-yellow-300 rounded-lg shadow-lg text-sm max-w-xs">
+            <p className="text-yellow-900 font-bold mb-1">🎓 Admin Training Mode</p>
+            <p className="text-yellow-800">
+              Click to progress when AI asks unnecessary follow-ups
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Main content */}
       <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full">
         {/* Header */}
@@ -552,6 +751,7 @@ export default function StepNew() {
               const isBeingRefined = isRefining === message.id
               const isBeingCompared = isComparing === message.id
               const isBeingCategorized = isCategorizing === message.id
+              const isViewingPrompt = viewingPrompt === message.id
               
               return (
                 <div key={message.id} className="relative">
@@ -789,6 +989,28 @@ export default function StepNew() {
                               >
                                 <GitCompare className="w-4 h-4 text-blue-600" />
                               </button>
+                              {currentStep < 7 && (
+                                <button
+                                  onClick={() => {
+                                    if (confirm('Mark that the phase should have progressed here?')) {
+                                      handleProgressPhase(message.id)
+                                    }
+                                  }}
+                                  className="p-2 bg-white rounded-lg shadow-sm hover:shadow-md border"
+                                  title="Phase should progress here"
+                                >
+                                  <FastForward className="w-4 h-4 text-green-600" />
+                                </button>
+                              )}
+                              {message.openaiPrompt && (
+                                <button
+                                  onClick={() => setViewingPrompt(viewingPrompt === message.id ? null : message.id)}
+                                  className={`p-2 bg-white rounded-lg shadow-sm hover:shadow-md border ${viewingPrompt === message.id ? 'bg-blue-50 border-blue-300' : ''}`}
+                                  title="View OpenAI prompt"
+                                >
+                                  <Code className="w-4 h-4 text-blue-600" />
+                                </button>
+                              )}
                             </>
                           )}
                           {message.type === 'user' && (
@@ -800,6 +1022,73 @@ export default function StepNew() {
                               <Tag className="w-4 h-4 text-purple-600" />
                             </button>
                           )}
+                        </div>
+                      )}
+                      {/* OpenAI Prompt Display (Admin Only) */}
+                      {isViewingPrompt && message.openaiPrompt && adminMode && (
+                        <div className="ml-11 mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-sm font-semibold text-blue-900">OpenAI API Prompt</h4>
+                            <button
+                              onClick={() => setViewingPrompt(null)}
+                              className="p-1 hover:bg-blue-100 rounded"
+                            >
+                              <X className="w-4 h-4 text-blue-600" />
+                            </button>
+                          </div>
+                          
+                          <div className="space-y-3">
+                            <div>
+                              <p className="text-xs font-medium text-blue-700 mb-1">Model Settings:</p>
+                              <div className="bg-white p-2 rounded text-xs font-mono">
+                                Model: {message.openaiPrompt.model}<br/>
+                                Temperature: {message.openaiPrompt.temperature}<br/>
+                                Max Tokens: {message.openaiPrompt.max_tokens}
+                              </div>
+                            </div>
+                            
+                            <div>
+                              <p className="text-xs font-medium text-blue-700 mb-1">System Prompt:</p>
+                              <div className="bg-white p-3 rounded max-h-48 overflow-y-auto">
+                                <pre className="text-xs whitespace-pre-wrap font-mono text-gray-700">
+                                  {message.openaiPrompt.system}
+                                </pre>
+                              </div>
+                            </div>
+                            
+                            <div>
+                              <p className="text-xs font-medium text-blue-700 mb-1">User Prompt:</p>
+                              <div className="bg-white p-3 rounded max-h-48 overflow-y-auto">
+                                <pre className="text-xs whitespace-pre-wrap font-mono text-gray-700">
+                                  {message.openaiPrompt.user}
+                                </pre>
+                              </div>
+                            </div>
+                            
+                            <div className="flex gap-2 pt-2">
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(
+                                    `SYSTEM:\n${message.openaiPrompt.system}\n\nUSER:\n${message.openaiPrompt.user}`
+                                  )
+                                  alert('Prompt copied to clipboard!')
+                                }}
+                                className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                              >
+                                Copy Full Prompt
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const promptData = JSON.stringify(message.openaiPrompt, null, 2)
+                                  navigator.clipboard.writeText(promptData)
+                                  alert('JSON copied to clipboard!')
+                                }}
+                                className="text-xs px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700"
+                              >
+                                Copy as JSON
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -827,6 +1116,48 @@ export default function StepNew() {
 
         {/* Input area */}
         <div className="border-t bg-white px-6 py-4">
+          {/* Admin controls */}
+          {adminMode && currentStep < 7 && messages.length > 0 && (
+            <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-yellow-900">Admin Controls:</span>
+                  <span className="text-xs text-yellow-700">Step {currentStep} of 7</span>
+                  <span className="text-xs text-yellow-600">
+                    | {messages.filter(m => m.type === 'user').length} user responses
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    const lastAiMessage = [...messages].reverse().find(m => m.type === 'ai')
+                    if (lastAiMessage && confirm('Mark that the phase should progress to Step ' + (currentStep + 1) + '?')) {
+                      handleProgressPhase(lastAiMessage.id)
+                    }
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors"
+                  title="Progress to next phase"
+                >
+                  <FastForward className="w-4 h-4" />
+                  Progress to Step {currentStep + 1}
+                </button>
+              </div>
+              <div className="mt-2 space-y-1">
+                <p className="text-xs text-yellow-700">
+                  Use this when the AI should have auto-progressed but didn't. The system will learn from this feedback.
+                </p>
+                {messages.filter(m => m.type === 'user').length > 0 && (
+                  <p className="text-xs text-yellow-600">
+                    Last user message: {(() => {
+                      const lastUserMsg = [...messages].reverse().find(m => m.type === 'user')
+                      return lastUserMsg ? 
+                        `"${lastUserMsg.content.substring(0, 50)}${lastUserMsg.content.length > 50 ? '...' : ''}" (${lastUserMsg.content.split(/\s+/).length} words)` 
+                        : 'None'
+                    })()}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
           <div className="flex gap-3">
             <input
               type="text"
@@ -853,10 +1184,10 @@ export default function StepNew() {
                 You've completed your reflection journey! 
               </p>
               <button
-                onClick={() => navigate('/start')}
+                onClick={() => navigate('/complete')}
                 className="w-full btn btn-success py-3"
               >
-                Return to Home
+                Complete Reflection
               </button>
             </div>
           )}
@@ -871,5 +1202,6 @@ export default function StepNew() {
         />
       </div>
     </div>
+    </>
   )
 }

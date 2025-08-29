@@ -491,6 +491,100 @@ export interface Database {
           created_at?: string
         }
       }
+      phase_progression_feedback: {
+        Row: {
+          id: string
+          session_id: string
+          step_id: number
+          response_id: string | null
+          user_message: string
+          ai_response: string
+          conversation_turn: number
+          should_have_progressed: boolean
+          admin_notes: string | null
+          user_word_count: number | null
+          had_emotions: boolean | null
+          had_values: boolean | null
+          had_perspective: boolean | null
+          message_category: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          session_id: string
+          step_id: number
+          response_id?: string | null
+          user_message: string
+          ai_response: string
+          conversation_turn: number
+          should_have_progressed?: boolean
+          admin_notes?: string | null
+          user_word_count?: number | null
+          had_emotions?: boolean | null
+          had_values?: boolean | null
+          had_perspective?: boolean | null
+          message_category?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          session_id?: string
+          step_id?: number
+          response_id?: string | null
+          user_message?: string
+          ai_response?: string
+          conversation_turn?: number
+          should_have_progressed?: boolean
+          admin_notes?: string | null
+          user_word_count?: number | null
+          had_emotions?: boolean | null
+          had_values?: boolean | null
+          had_perspective?: boolean | null
+          message_category?: string | null
+          created_at?: string
+        }
+      }
+      phase_progression_patterns: {
+        Row: {
+          id: string
+          step_id: number
+          min_conversation_turns: number | null
+          min_word_count: number | null
+          requires_emotions: boolean
+          requires_values: boolean
+          requires_perspective: boolean
+          triggering_categories: string[] | null
+          feedback_count: number
+          confidence_score: number
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          step_id: number
+          min_conversation_turns?: number | null
+          min_word_count?: number | null
+          requires_emotions?: boolean
+          requires_values?: boolean
+          requires_perspective?: boolean
+          triggering_categories?: string[] | null
+          feedback_count?: number
+          confidence_score?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          step_id?: number
+          min_conversation_turns?: number | null
+          min_word_count?: number | null
+          requires_emotions?: boolean
+          requires_values?: boolean
+          requires_perspective?: boolean
+          triggering_categories?: string[] | null
+          feedback_count?: number
+          confidence_score?: number
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

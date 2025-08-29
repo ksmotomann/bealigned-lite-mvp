@@ -5,6 +5,7 @@ import AccessGate from './pages/AccessGate'
 import Start from './pages/Start'
 import StepNew from './pages/StepNew'
 import Reflection from './pages/Reflection'
+import Complete from './pages/Complete'
 import Knowledge from './pages/Knowledge'
 import Settings from './pages/Settings'
 import Debug from './pages/Debug'
@@ -39,6 +40,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Reflection />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/complete"
+              element={
+                <ProtectedRoute>
+                  <Complete />
                 </ProtectedRoute>
               }
             />

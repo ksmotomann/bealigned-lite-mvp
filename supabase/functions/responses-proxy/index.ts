@@ -8,21 +8,27 @@ const corsHeaders = {
 }
 
 // BeAligned™ Beta Lite system prompt from BABL Revised Operating Instructions
-const systemPrompt = `You are BeAligned™ Beta Lite — a warm, grounded, nonjudgmental reflection bot built to support one co-parent in thinking through a current challenge. Your goal is to guide the user through a 7-phase reflective process rooted in the BeH2O® communication framework and BeAligned™ mindset. You help the user uncover their deeper purpose ("why"), consider the perspectives of others, and move toward aligned, child-centered communication.
+const systemPrompt = `You are BeAligned™ Beta Lite — a warm, grounded, nonjudgmental reflection companion built to support one co-parent in thinking through a current challenge. Your goal is to guide the user through a 7-phase reflective process rooted in the BeH2O® communication framework and BeAligned™ mindset. You help the user uncover their deeper purpose ("why"), consider the perspectives of others, and move toward aligned, child-centered communication.
 
-You are NOT a therapist, mediator, or legal advisor. You do not make decisions or take sides. You do not use robotic scripts or generic advice. Your job is to invite clarity, calm, and compassion — step by step.
+You are NOT a therapist, mediator, or legal advisor. You do not make decisions or take sides. You speak like a caring friend who deeply understands, not a clinical professional. Your job is to invite clarity, calm, and compassion — step by step.
+
+CRITICAL: NEVER use the phrase "Oh, friend" or "Oh friend" - it sounds artificial and patronizing. Be genuine and grounded.
 
 CONVERSATIONAL APPROACH:
-- Respond naturally and warmly in your validation and reflections
-- Use the EXACT BeAligned prompts provided - DO NOT paraphrase or modify them
-- Acknowledge what the user shares with genuine validation before asking the exact prompt
-- Be conversational in your reflections but use prompts VERBATIM
-- Stay present with their emotions and reflect back what you're hearing
-- Build on their responses with curiosity and compassion
+- RECOGNIZE HEAVY SHARES: When someone shares addiction, abuse, serious illness, or deep pain, respond with genuine compassion
+- For ADDICTION specifically: "Addiction in a co-parenting relationship brings so much unpredictability and fear. The constant worry about your children's safety, trying to maintain stability when everything feels chaotic... This is an enormous challenge you're navigating."
+- For serious issues, take 3-4 sentences to acknowledge the complexity and difficulty
+- VARY YOUR RESPONSES: Use specific, authentic acknowledgments that reference what they've actually shared
+- Match the emotional weight: Light issues get warm responses, heavy issues get deeper acknowledgment
+- Natural language examples: "That sounds incredibly difficult" / "What a complex situation to navigate" / "The challenges you're describing are real and significant" / "This situation clearly weighs heavily on you"
+- Use the EXACT BeAligned prompts provided including phase numbers and titles
+- Stay present with their specific situation - reference their actual words
+- For Step 2 specifically after heavy shares: Really honor their courage in naming the issue before exploring feelings
 - SYNTHESIZE themes from across phases - connect current insights to earlier emotions and values
 - When transitioning phases, offer brief reflective summaries that help users see connections
-- Validate the depth and significance of what's been shared CONCISELY
-- Be CONCISE per BeH2O CLEAR principles - 2-3 sentences maximum
+- Validate the depth and significance of what's been shared 
+- For typical shares: 2-3 sentences before the prompt (BeH2O CLEAR principles)
+- For HEAVY shares (addiction, abuse, loss): 3-5 sentences of genuine acknowledgment before the prompt
 - Build cumulatively - reference earlier insights to show the journey's progression
 
 PHASE PROGRESSION:
@@ -83,13 +89,13 @@ const stepGuidance = {
   4: {
     title: "STEP INTO YOUR CO-PARENT'S SHOES",
     goal: "Encourage empathy without justification",
-    initialPrompt: "If your co-parent described this, how might they see it?",
+    initialPrompt: "If your co-parent were describing this situation, how might they see it?",
     probes: [
       "Even if you don't agree, what do you imagine they're feeling or needing?",
       "What might be driving their reaction? What do they care about, in their own way?",
       "What needs might they be trying to meet?"
     ],
-    guidance: "Help the user name their co-parent's possible 'why.' Encourage empathy without justification.",
+    guidance: "CRITICAL: Ask about the CO-PARENT'S PERSPECTIVE, not the user's hopes. Help them consider how their co-parent sees the situation.",
     completion: "When user has genuinely considered co-parent's perspective",
     transition: "That took real courage to see things from their perspective. Now let's center your child's experience."
   },
@@ -195,7 +201,7 @@ serve(async (req) => {
     const stepConfig = stepGuidance[step_id as keyof typeof stepGuidance]
     const conversationTurns = stepHistory?.length || 0
     
-    // Enhanced completion detection - more nuanced per step
+    // Intelligent response interpretation
     const userWords = user_text.split(' ').length
     const userSentences = user_text.split(/[.!?]+/).filter(s => s.trim().length > 0).length
     
@@ -203,60 +209,87 @@ serve(async (req) => {
     const allStepText = stepHistory?.map(r => r.user_text).join(' ') || ''
     const cumulativeWords = allStepText.split(' ').length + userWords
     
-    // Check for quality indicators
-    const hasSpecifics = /\b(because|when|every|always|often|sometimes|yesterday|today|last week|Monday|Tuesday|Wednesday|Thursday|Friday|weekend)\b/i.test(user_text)
-    const hasEmotions = /\b(feel|felt|feeling|angry|sad|frustrated|hurt|worried|scared|happy|anxious|overwhelmed|disappointed)\b/i.test(user_text)
+    // Interpret response type based on CONTEXT, not keywords
+    // Step 1: Have they described a situation?
+    const step1Complete = step_id === 1 && (
+      userWords >= 5 || // They've given at least a brief description
+      conversationTurns >= 1 // Any prior response in this step
+    )
     
-    // Check if they've named a concrete issue (Phase 1 specific)
-    const hasNamedIssue = /\b(is|are|was|were|keeps|won't|doesn't|always|never|refuses|insists|demands|wants|needs|struggling|feeling|not)\b/i.test(user_text)
-    const hasSubject = /\b(co-?parent|ex|they|he|she|mother|father|mom|dad|partner|attorney|lawyer|mediator|court|judge|GAL|custody|visitation|parenting time|counselor|therapist|school|teacher|child|kids|son|daughter)\b/i.test(user_text)
+    // Step 2: Have they expressed feelings about it?
+    const step2Complete = step_id === 2 && (
+      userWords >= 3 || // Even "fear and uncertainty" is enough
+      conversationTurns >= 1 // Any prior response in this step
+    )
     
-    // Check if response is clearly articulated and complete
-    const isClearlyArticulated = userWords >= 10 && (hasNamedIssue || hasEmotions) && hasSubject
+    // Step 3: Have they touched on their values/why?
+    const step3Complete = step_id === 3 && (
+      userWords >= 5 || // Basic expression of values
+      conversationTurns >= 1 // Any prior response in this step
+    )
     
-    // Check for emotional complexity (multiple emotions or emotional nuance)
-    const hasEmotionalComplexity = (user_text.match(/\b(feel|feeling|felt|angry|sad|frustrated|hurt|worried|scared|happy|anxious|overwhelmed|disappointed|trapped|unseen|grateful|wrestling)\b/gi)?.length >= 2) || 
-      /\b(simultaneously|both|also|but|however|though|while|mixed|complex)\b/i.test(user_text)
+    // Step 4: Have they considered co-parent's perspective?
+    const step4Complete = step_id === 4 && (
+      userWords >= 3 || // Even brief perspective is OK
+      conversationTurns >= 1 // Any prior response in this step
+    )
     
-    // Check for values/motivations language (indicates they're expressing their "why")
-    const hasValuesLanguage = /\b(protect|advocate|support|family|future|long-term|security|resources|strength|depleted|sustainable|maintain|preserve|ensure|provide|care|love|safe|safety|stability|stable)\b/i.test(user_text) ||
-      /\b(important|value|matters|believe|need|want|hope|why|because|purpose|goal|priority|faith|christ|god|kingdom|heaven|witness|legacy|mission|calling|sacred|eternal|grounded|rooted)\b/i.test(user_text)
+    // Step 5: Have they considered child's perspective?
+    const step5Complete = step_id === 5 && (
+      userWords >= 3 || // Brief child perspective
+      conversationTurns >= 1 // Any prior response in this step
+    )
     
-    // Check for user completion signals - they're ready to move on
-    const userSignalsCompletion = /\b(that's it|thats it|that's really it|thats really it|that's all|thats all|i'm done|im done|let's move on|lets move on|next|move forward|i'm ready|im ready|that works|finished|complete|done|enough)\b/i.test(user_text) ||
-      /^(yep|yes|yeah|ok|okay|sure|exactly|precisely|correct)\.?$|^(that's|thats)\s+(it|all|enough)\.?$|^(i'm|im)\s+(done|ready|finished)\.?$/i.test(user_text.trim())
+    // Step 6: Have they engaged with options?
+    const step6Complete = step_id === 6 && conversationTurns >= 0 // Any response
     
-    // Check for user fatigue/readiness signals - short responses that suggest they want to move on
-    const userShowsFatigue = (userWords <= 3 && conversationTurns >= 1) || // Very short responses after engagement
-      (userWords <= 5 && conversationTurns >= 2) || // Short responses after multiple turns
-      /^(my\s+\w+|the\s+\w+|just\s+\w+|yes|no|maybe|sure|okay|idk|dunno)\.?$/i.test(user_text.trim()) // Minimal/tired responses
+    // Step 7: Have they crafted a message?
+    const step7Complete = step_id === 7 && conversationTurns >= 0 // Any response
     
-    // Combined completion signal - explicit signals OR signs of fatigue with some engagement
-    const userWantsToProgress = userSignalsCompletion || (userShowsFatigue && conversationTurns >= 1)
+    // Check for explicit progression signals
+    const userSignalsCompletion = /\b(that's it|thats it|that's all|thats all|done|finished|next|ready)\b/i.test(user_text) ||
+      /^(yes|yeah|ok|okay|sure)\s*\.?$/i.test(user_text.trim())
     
-    // Step-specific completion checks - MINIMAL prompting, fast progression
-    const stepCompletionChecks = {
-      1: hasNamedIssue || userWords >= 5,  // Progress immediately if issue is clear
-      2: hasEmotions || conversationTurns >= 1, // One response about feelings is enough
-      3: userWords >= 8 || conversationTurns >= 1, // Quick progression after any substantive response
-      4: userWords >= 5 || conversationTurns >= 1, // Any attempt at perspective-taking
-      5: userWords >= 5 || conversationTurns >= 1, // Any response about child
-      6: conversationTurns >= 1, // One response generates options
-      7: conversationTurns >= 1 // One response to craft message
+    // Determine if response needs more depth
+    const responseIsMinimal = userWords <= 2 && conversationTurns === 0
+    const responseIsVague = userWords < 5 && !userSignalsCompletion && conversationTurns === 0
+    
+    // Check learned patterns from admin feedback
+    let learnedPattern = null
+    try {
+      const { data: pattern } = await supabase
+        .from('phase_progression_patterns')
+        .select('*')
+        .eq('step_id', step_id)
+        .single()
+      
+      if (pattern && pattern.confidence_score > 0.6) {
+        learnedPattern = pattern
+      }
+    } catch (error) {
+      console.log('Could not load learned patterns:', error)
     }
     
-    const meetsStepRequirements = stepCompletionChecks[step_id as keyof typeof stepCompletionChecks] || false
-    const needsMoreDepth = !meetsStepRequirements && conversationTurns < 2 && !userWantsToProgress  // Quick progression
-    const isVague = userWords < 3 && !hasSpecifics && !hasEmotions && !userShowsFatigue  // Very lenient
+    // Determine phase completion based on step and response interpretation
+    const stepCompletionMap = {
+      1: step1Complete,
+      2: step2Complete,
+      3: step3Complete,
+      4: step4Complete,
+      5: step5Complete,
+      6: step6Complete,
+      7: step7Complete
+    }
     
-    // Determine if we should auto-progress to next step - FAST progression
-    // Allow progression on first turn if response has substance
-    const hasMinimumDepth = step_id === 1 
-      ? isClearlyArticulated || (conversationTurns >= 1 && cumulativeWords >= 15)
-      : conversationTurns >= 1 && cumulativeWords >= 15
-    // If user wants to progress (explicit signal OR fatigue), honor that
-    const stepComplete = userWantsToProgress || (meetsStepRequirements && (hasMinimumDepth || isClearlyArticulated) && !isVague)
-    const shouldAutoProgress = stepComplete && step_id < 7
+    const stepComplete = stepCompletionMap[step_id as keyof typeof stepCompletionMap] || false
+    
+    // Override with learned patterns if available
+    const meetsLearnedRequirements = learnedPattern ? 
+      conversationTurns >= (learnedPattern.min_conversation_turns || 1) : false
+    
+    // Final decision: progress if step is complete OR user explicitly wants to
+    const shouldAutoProgress = (stepComplete || userSignalsCompletion || meetsLearnedRequirements) && step_id < 7
+    const needsMoreDepth = responseIsVague && !shouldAutoProgress
     
     // Get next step info if progressing
     const nextStepConfig = shouldAutoProgress ? stepGuidance[(step_id + 1) as keyof typeof stepGuidance] : null
@@ -267,15 +300,8 @@ serve(async (req) => {
       input: user_text.substring(0, 50) + '...',
       words: userWords,
       turns: conversationTurns,
-      hasNamedIssue,
-      hasSubject,
-      hasEmotions,
-      hasValuesLanguage,
+      stepComplete,
       userSignalsCompletion,
-      userShowsFatigue,
-      userWantsToProgress,
-      isClearlyArticulated,
-      meetsStepRequirements,
       shouldProgress: shouldAutoProgress
     })
     
@@ -289,23 +315,43 @@ serve(async (req) => {
       ?.map(r => `User: ${r.user_text}\nGuide: ${r.ai_text}`)
       ?.join('\n')
 
-    // Get refinement examples to guide the AI (not replace it)
+    // Get refinement examples to guide the AI - prioritize HIGH confidence admin edits
     let refinementContext = ''
     try {
-      const { data: bestRefinement } = await supabase
-        .rpc('get_best_refinement', {
-          p_step_id: step_id,
-          p_user_text: user_text
-        })
+      // First check for recent high-confidence admin refinements
+      const { data: adminRefinement } = await supabase
+        .from('refined_responses')
+        .select('*')
+        .eq('step_id', step_id)
+        .eq('is_approved', true)
+        .gte('confidence', 0.9) // High confidence admin edits
+        .order('created_at', { ascending: false })
+        .limit(1)
         .single()
       
-      if (bestRefinement && bestRefinement.confidence >= 0.7) {
-        const exampleResponse = bestRefinement.use_chatgpt 
-          ? bestRefinement.chatgpt_response 
-          : bestRefinement.refined_text
+      if (adminRefinement && (adminRefinement.use_chatgpt_as_primary || adminRefinement.refined_text)) {
+        const adminExample = adminRefinement.use_chatgpt_as_primary 
+          ? adminRefinement.chatgpt_response 
+          : adminRefinement.refined_text
         
-        if (exampleResponse) {
-          refinementContext = `\n\nExample of a good response for similar input: "${exampleResponse}"\nUse this as inspiration but create your own response following the exact phase prompts.`
+        refinementContext = `\n\nIMPORTANT - Admin-approved response pattern (USE THIS STYLE):\n"${adminExample}"\n${adminRefinement.feedback ? `Guidance: ${adminRefinement.feedback}` : ''}\nMatch this tone and approach closely.`
+      } else {
+        // Fall back to RPC for general refinements
+        const { data: bestRefinement } = await supabase
+          .rpc('get_best_refinement', {
+            p_step_id: step_id,
+            p_user_text: user_text
+          })
+          .single()
+        
+        if (bestRefinement && bestRefinement.confidence >= 0.7) {
+          const exampleResponse = bestRefinement.use_chatgpt 
+            ? bestRefinement.chatgpt_response 
+            : bestRefinement.refined_text
+          
+          if (exampleResponse) {
+            refinementContext = `\n\nExample of a good response for similar input: "${exampleResponse}"\nUse this as inspiration but create your own response following the exact phase prompts.`
+          }
         }
       }
     } catch (error) {
@@ -313,38 +359,12 @@ serve(async (req) => {
       console.log('Could not load refinements:', error)
     }
 
-    // Call OpenAI
-    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { 
-            role: 'system', 
-            content: `${systemPrompt}\n\nCurrent step ${step_id}: ${stepConfig.goal}\nGuidance: ${stepConfig.guidance}\n\nPrevious context:\n${previousContext || 'None'}${refinementContext}`
-          },
-          {
-            role: 'user',
-            content: `Step history:\n${currentStepHistory || 'None'}\n\nLatest response: "${user_text}"\n\n${
-              shouldAutoProgress
-                ? `PHASE TRANSITION - Be CONCISE per BeH2O CLEAR principles.
-
-${userSignalsCompletion ? 'Acknowledge their readiness to move forward' : userShowsFatigue ? 'Honor their brief response' : 'Validate'}: "${stepConfig.transition}"
-
-Brief synthesis connecting this phase to their journey. Reference ONE specific thing they said.
-
----
-
-**${step_id + 1}. ${nextStepConfig?.title}**
-**${nextStepConfig?.initialPrompt}**
-
-BE CONCISE: 2-3 sentences MAX before the separator. Use the EXACT prompt shown above - copy it VERBATIM, do NOT paraphrase.`
-                : step_id === 7 && stepComplete
-                  ? `FINAL PHASE COMPLETION - Create a comprehensive, beautifully formatted response that synthesizes their entire 7-phase journey.
+    // Build the complete OpenAI prompt for admin visibility
+    const systemMessage = `${systemPrompt}\n\nCurrent step ${step_id}: ${stepConfig.goal}\nGuidance: ${stepConfig.guidance}\n\nPrevious context:\n${previousContext || 'None'}${refinementContext}`
+    
+    const userMessage = `Step history:\n${currentStepHistory || 'None'}\n\nLatest response: "${user_text}"\n\n${
+              step_id === 7 && stepComplete
+                ? `FINAL PHASE COMPLETION - Create a comprehensive, beautifully formatted response that synthesizes their entire 7-phase journey.
 
 SYNTHESIS INSTRUCTIONS:
 1. Review ALL previous conversation history to understand their complete journey
@@ -373,29 +393,61 @@ This message reflects your commitment to [their core values] while staying focus
 Remember: alignment doesn't mean agreement — it means staying centered on what matters most.
 
 CRITICAL: Make this response deeply thoughtful, well-formatted with sections and horizontal lines (---), and show you truly understand their complete journey. Match the sophistication and care of the ChatGPT sample.`
-                : needsMoreDepth || isVague 
-                  ? `DEEPER EXPLORATION - Be CONCISE:
+                : `INTELLIGENT RESPONSE - Interpret and decide next action.
 
-Validate briefly (1 sentence). ${stepConfig.guidance}
+User's response: "${user_text}"
+Words in response: ${userWords}
+Conversation turns so far: ${conversationTurns}
+Current step: ${step_id}
 
-**${stepConfig.probes[Math.min(conversationTurns, stepConfig.probes.length - 1)]}**`
-                : conversationTurns === 0 && !meetsStepRequirements
-                  ? `FIRST RESPONSE - Be CONCISE:
+DECISION FRAMEWORK - YOU MUST FOLLOW THIS EXACTLY:
 
-${stepConfig.guidance} Acknowledge what you heard (1-2 sentences).
+Step ${step_id} - User said: "${user_text}" (${userWords} words)
+Previous turns in this step: ${conversationTurns}
 
-**${stepConfig.initialPrompt}**`
-                : `CONTINUING EXPLORATION - Be CONCISE:
+PROGRESSION RULES:
+- Step 1: Progress if 5+ words OR any second response
+- Step 2: Progress if 3+ words (feelings) OR any second response  
+- Step 3: Progress if 5+ words (values) OR any second response - "to ensure my sons..." COUNTS
+- Step 4: Progress if 3+ words (perspective) OR any second response
+- Step 5-7: Progress after any response
 
-Reflect and validate (1-2 sentences). ${stepConfig.guidance}
+Current Step 3 example: "to ensure my sons are afforded the most supportive parenting dynamic" = 10 words = PROGRESS TO STEP 4
 
-**${stepConfig.probes[Math.min(conversationTurns - 1, stepConfig.probes.length - 1)]}**`
+${stepConfig.guidance}
+
+MANDATORY ACTION:
+${userWords >= (step_id === 2 || step_id === 4 || step_id === 5 ? 3 : 5) || conversationTurns >= 1 
+  ? `PROGRESS TO NEXT PHASE - Use this EXACT format:
+[Acknowledge their response briefly]
+
+---
+
+**${(step_id + 1)}. ${step_id < 7 ? stepGuidance[(step_id + 1) as keyof typeof stepGuidance]?.title || '' : ''}**
+**${step_id < 7 ? stepGuidance[(step_id + 1) as keyof typeof stepGuidance]?.initialPrompt || '' : ''}**`
+  : `PROBE FOR MORE - Use: **${stepConfig.probes[Math.min(conversationTurns, stepConfig.probes.length - 1)]}**`}`
             }\n\nCRITICAL INSTRUCTIONS:
-1. Be CONCISE per BeH2O CLEAR principles - Use 2-3 sentences MAX for validation/reflection
-2. ALWAYS use the EXACT prompt text provided above in bold - DO NOT paraphrase or create your own questions
-3. The bold prompt must be VERBATIM as shown - copy it exactly word-for-word
-4. Get to the point quickly while remaining warm and professional`
-          }
+1. NEVER USE "Oh, friend" or "Oh friend" or any variation - it's patronizing and artificial
+2. MATCH THE EMOTIONAL WEIGHT: Light shares = 2-3 sentences. Heavy shares (addiction/abuse/trauma) = 3-5 sentences of acknowledgment
+3. For addiction: "Dealing with addiction in your co-parenting relationship brings such uncertainty and fear. Protecting your children while managing this situation - it's one of the most difficult challenges a parent can face."
+4. ALWAYS use the EXACT prompt text provided above in bold - DO NOT paraphrase or create your own questions
+5. For Step 4 specifically: You MUST ask about the co-parent's perspective using the exact prompt provided
+6. Be genuine and specific - reference what they actually shared
+7. Use authentic, grounded language: "This sounds incredibly challenging" / "What you're navigating is truly difficult" / "The weight of this situation is clear"
+8. FORBIDDEN PHRASES: "Oh, friend" / "Oh my heart" / "Oh dear" - Be warm but professional`
+    
+    // Call OpenAI with the constructed messages
+    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemMessage },
+          { role: 'user', content: userMessage }
         ],
         temperature: 0.7,  // Natural, conversational responses
         max_tokens: step_id === 7 && stepComplete ? 400 : 250 // CONCISE per BeH2O principles
@@ -414,7 +466,7 @@ Reflect and validate (1-2 sentences). ${stepConfig.guidance}
     // Log for debugging
     console.log('User input:', user_text)
     console.log('Completion signal test:', userSignalsCompletion)
-    console.log('Fatigue signal test:', userShowsFatigue)
+    // Removed old debug log
     console.log('AI response:', aiText)
     
     // Fallback responses if AI fails - make them more generic and appropriate
@@ -536,6 +588,14 @@ Reflect and validate (1-2 sentences). ${stepConfig.guidance}
           source_type: override_response ? 'refined' : 
                        wasRefined ? 'refined' : 
                        'ai'
+        },
+        // Include OpenAI prompt for admin visibility
+        openai_prompt: {
+          system: systemMessage,
+          user: userMessage,
+          model: 'gpt-4o-mini',
+          temperature: 0.7,
+          max_tokens: step_id === 7 && stepComplete ? 400 : 250
         }
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
