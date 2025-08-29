@@ -91,12 +91,12 @@ const stepGuidance = {
     goal: "Encourage empathy without justification",
     initialPrompt: "If your co-parent were describing this situation, how might they see it?",
     probes: [
-      "Even if you don't agree, what do you imagine they're feeling or needing?",
-      "What might be driving their reaction? What do they care about, in their own way?",
-      "What needs might they be trying to meet?"
+      "Beyond how they might see you, what positive intentions might they have? What might they be hoping for your child?",
+      "Even if you don't agree with their approach, what do you imagine they're feeling or needing?",
+      "What might they value or care about that's driving this choice? What's their 'why'?"
     ],
-    guidance: "CRITICAL: Ask about the CO-PARENT'S PERSPECTIVE, not the user's hopes. Help them consider how their co-parent sees the situation.",
-    completion: "When user has genuinely considered co-parent's perspective",
+    guidance: "CRITICAL: When user says how co-parent sees THEM (controlling, unreasonable), redirect to explore co-parent's actual NEEDS and POSITIVE INTENTIONS. What might co-parent be hoping to give the child?",
+    completion: "When user has genuinely considered co-parent's deeper motivations and needs",
     transition: "That took real courage to see things from their perspective. Now let's center your child's experience."
   },
   5: {
@@ -431,10 +431,11 @@ ${userWords >= (step_id === 2 || step_id === 4 || step_id === 5 ? 3 : 5) || conv
 2. MATCH THE EMOTIONAL WEIGHT: Light shares = 2-3 sentences. Heavy shares (addiction/abuse/trauma) = 3-5 sentences of acknowledgment
 3. For addiction: "Dealing with addiction in your co-parenting relationship brings such uncertainty and fear. Protecting your children while managing this situation - it's one of the most difficult challenges a parent can face."
 4. ALWAYS use the EXACT prompt text provided above in bold - DO NOT paraphrase or create your own questions
-5. For Step 4 specifically: You MUST ask about the co-parent's perspective using the exact prompt provided
-6. Be genuine and specific - reference what they actually shared
-7. Use authentic, grounded language: "This sounds incredibly challenging" / "What you're navigating is truly difficult" / "The weight of this situation is clear"
-8. FORBIDDEN PHRASES: "Oh, friend" / "Oh my heart" / "Oh dear" - Be warm but professional`
+5. For Step 4 CRITICAL: If user says how co-parent sees THEM (controlling/unreasonable), redirect to explore co-parent's ACTUAL needs/intentions: "That might be how they see you, but beyond that - what positive intentions might they have for your child?"
+6. Step 4 must explore co-parent's deeper "why" - their values, hopes, and positive intentions for the child
+7. Be genuine and specific - reference what they actually shared
+8. Use authentic, grounded language: "This sounds incredibly challenging" / "What you're navigating is truly difficult" / "The weight of this situation is clear"
+9. FORBIDDEN PHRASES: "Oh, friend" / "Oh my heart" / "Oh dear" - Be warm but professional`
     
     // Call OpenAI with the constructed messages
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
